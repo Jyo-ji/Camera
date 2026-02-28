@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void openCamera() {
-        // Obtén el CameraManager
+        // Obtén el CameraManageraaaaaa
         CameraManager manager = (CameraManager) getSystemService(Context.CAMERA_SERVICE);
         try {
             String cameraId = manager.getCameraIdList()[0];
