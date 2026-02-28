@@ -1,56 +1,84 @@
-name: Auto PR with Copilot
+name: Auto PR with Copilot Logic
 
-# Se dispara al crear un branch nuevo
 on:
-  create:
-    branches:
-      - '**'  # cualquier branch nuevo
+  push:
+    branches-ignore:
+      - main
 
 jobs:
   auto-pr:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
 
     steps:
-      # 1️⃣ Checkout del repositorio
+      # 1️⃣ Descargar el repo con historial completo
       - name: Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 
 
       # 2️⃣ Configurar Git
       - name: Configure Git
         run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # 3️⃣ Commit automático si hay cambios
-      - name: Commit changes if any
+      # 3️⃣ Sincronizar cambios (Evita el error 'rejected')
+      - name: Commit and Push changes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           git add .
-          git commit -m "AUTO: cambios detectados en $GITHUB_REF_NAME" || echo "No hay cambios para commitear"
-          git push origin HEAD
+          if ! git diff --cached --quiet; then
+            git commit -m "AUTO: Actualización de archivos"
+            git pull origin ${GITHUB_REF_NAME} --rebase
+            git push origin HEAD
+          else
+            echo "Nada nuevo que commitear."
+          fi
 
-      # 4️⃣ Generar descripción del PR con Copilot CLI
-      - name: Generate PR Body with Copilot
-        id: copilot
+      # 4️⃣ Generar descripción AUTOMÁTICA (Sustituye a Copilot CLI)
+      - name: Generate PR Body
+        id: pr_info
         run: |
-          # Guardar los cambios recientes en un diff
-          git diff HEAD~1..HEAD > changes.diff || echo "No hay cambios previos"
+          git fetch origin main --quiet
           
-          # Generar el PR body usando Copilot CLI
-          PR_BODY=$(copilot suggest --input-file changes.diff --prompt "Genera un Pull Request profesional que resuma estos cambios, incluya descripción detallada, lista de cambios y notas de validación")
+          # Obtenemos los mensajes de los commits y los archivos cambiados
+          COMMITS=$(git log origin/main..HEAD --oneline)
+          STATS=$(git diff origin/main...HEAD --stat)
           
           echo "pr_body<<EOF" >> $GITHUB_OUTPUT
-          echo "$PR_BODY" >> $GITHUB_OUTPUT
+          echo "## 🤖 Resumen Automático de Cambios" >> $GITHUB_OUTPUT
+          echo "He analizado los commits en esta rama respecto a **main**:" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### 📝 Historial de Commits:" >> $GITHUB_OUTPUT
+          echo "\`\`\`text" >> $GITHUB_OUTPUT
+          echo "$COMMITS" >> $GITHUB_OUTPUT
+          echo "\`\`\`" >> $GITHUB_OUTPUT
+          echo "" >> $GITHUB_OUTPUT
+          echo "### 📊 Archivos y Líneas:" >> $GITHUB_OUTPUT
+          echo "\`\`\`text" >> $GITHUB_OUTPUT
+          echo "$STATS" >> $GITHUB_OUTPUT
+          echo "\`\`\`" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      # 5️⃣ Crear el Pull Request automáticamente
-      - name: Create Pull Request
+      # 5️⃣ Crear o Actualizar el Pull Request
+      - name: Create or Update Pull Request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Extraer ticket del nombre del branch (ej: feature/TICKET-123-nombre)
-          BRANCH_NAME=$GITHUB_REF_NAME
-          TICKET=$(echo $BRANCH_NAME | grep -oE 'TICKET-[0-9]+')
+          BRANCH_NAME=${GITHUB_REF_NAME}
+          PR_EXISTS=$(gh pr list --head "$BRANCH_NAME" --json number --jq '.[0].number')
           
-          gh pr create \
-            --title "AUTO: $BRANCH_NAME" \
-            --body "Ticket: ${TICKET:-[INGRESA_TICKET]}\n\n${{ steps.copilot.outputs.pr_body }}" \
-            --base main \
-            --head $BRANCH_NAME
+          if [ -z "$PR_EXISTS" ]; then
+            gh pr create \
+              --title "🚀 Auto PR: $BRANCH_NAME" \
+              --body "${{ steps.pr_info.outputs.pr_body }}" \
+              --base main \
+              --head "$BRANCH_NAME"
+          else
+            gh pr edit "$PR_EXISTS" --body "${{ steps.pr_info.outputs.pr_body }}"
+            echo "PR #$PR_EXISTS actualizado con nueva descripción."
+          fi
