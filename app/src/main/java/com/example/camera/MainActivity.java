@@ -153,6 +153,7 @@ public class MainActivity extends AppCompatActivity {
             }, null);
         } catch (CameraAccessException e) {
             e.printStackTrace();
+            //Coment 
         }
     }
 
@@ -303,6 +304,11 @@ public class MainActivity extends AppCompatActivity {
     private void showToast(String message) {
         Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
     }
+
+        private void showToastTemp(String message) {
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show();
+    }
+
 
     private void clearCache() {
         File cacheDir = getCacheDir();
