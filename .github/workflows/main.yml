@@ -1,0 +1,56 @@
+name: Auto PR with Copilot
+
+# Se dispara al crear un branch nuevo
+on:
+  create:
+    branches:
+      - '**'  # cualquier branch nuevo
+
+jobs:
+  auto-pr:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout del repositorio
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Configurar Git
+      - name: Configure Git
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "actions@github.com"
+
+      # 3️⃣ Commit automático si hay cambios
+      - name: Commit changes if any
+        run: |
+          git add .
+          git commit -m "AUTO: cambios detectados en $GITHUB_REF_NAME" || echo "No hay cambios para commitear"
+          git push origin HEAD
+
+      # 4️⃣ Generar descripción del PR con Copilot CLI
+      - name: Generate PR Body with Copilot
+        id: copilot
+        run: |
+          # Guardar los cambios recientes en un diff
+          git diff HEAD~1..HEAD > changes.diff || echo "No hay cambios previos"
+          
+          # Generar el PR body usando Copilot CLI
+          PR_BODY=$(copilot suggest --input-file changes.diff --prompt "Genera un Pull Request profesional que resuma estos cambios, incluya descripción detallada, lista de cambios y notas de validación")
+          
+          echo "pr_body<<EOF" >> $GITHUB_OUTPUT
+          echo "$PR_BODY" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      # 5️⃣ Crear el Pull Request automáticamente
+      - name: Create Pull Request
+        run: |
+          # Extraer ticket del nombre del branch (ej: feature/TICKET-123-nombre)
+          BRANCH_NAME=$GITHUB_REF_NAME
+          TICKET=$(echo $BRANCH_NAME | grep -oE 'TICKET-[0-9]+')
+          
+          gh pr create \
+            --title "AUTO: $BRANCH_NAME" \
+            --body "Ticket: ${TICKET:-[INGRESA_TICKET]}\n\n${{ steps.copilot.outputs.pr_body }}" \
+            --base main \
+            --head $BRANCH_NAME
