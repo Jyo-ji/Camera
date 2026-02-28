@@ -216,8 +216,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }, null);
         } catch (CameraAccessException e) {
-            e.printStackTrace();
-            Log.e("CameraError", "Camera access error: " + e.getMessage());
+          
         }
     }
 
@@ -227,10 +226,10 @@ public class MainActivity extends AppCompatActivity {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         bitmap.compress(Bitmap.CompressFormat.JPEG, quality, stream);
 
-        // Convertir MB a bytes
+
         final int MAX_SIZE_BYTES = maxSizeMB * 1024 * 1024;
 
-        // Reducir la calidad mientras el tamaño de la imagen comprimida sea mayor que el límite
+       
         while (stream.toByteArray().length > MAX_SIZE_BYTES && quality > 0) {
             stream.reset();  // Limpiar el stream
             quality -= 5;    // Reducir la calidad en un 5% en cada iteración
@@ -258,7 +257,7 @@ public class MainActivity extends AppCompatActivity {
             int height = imageDimension.getHeight();
             int sizeInKB = bytes.length / 1024;
 
-            // Mostrar detalles de la imagen
+       
             TextView imageDetailsTextView = findViewById(R.id.imageDetailsTextView);
             String details = "Width: " + width + " px\nHeight: " + height + " px\nSize: " + sizeInKB + " KB";
             imageDetailsTextView.setText(details);
